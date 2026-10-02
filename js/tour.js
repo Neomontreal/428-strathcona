@@ -26,7 +26,8 @@
 
   const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
   const smooth = (a, b, v) => { const t = clamp((v - a) / (b - a)); return t * t * (3 - 2 * t); };
-  const ease = t => (t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+  const ease = t => t * t * (3 - 2 * t);   // suave en los extremos, sin acelerones a mitad del tramo
+  const SMOOTH_MS = 150;                     // inercia: la cámara sigue al scroll con ~150 ms de deslizamiento
   const HOLD = .42;            // parte de cada tramo con la cámara quieta (texto visible)
   const END = .6;              // la última parada también se queda un rato
   const T = n - 1 + END;
@@ -61,20 +62,24 @@
   // Dibuja el cuadro más cercano ya descargado con la misma geometría que las fotos (caja 16:9 que cubre,
   // centrada por el enfoque y escalada desde él): el primer cuadro coincide con la foto de salida y el último con la de llegada.
   const HOLD_ZOOM = 1.035;
+  const ready = f => f && f.complete && f.naturalWidth;
   const drawFrame = (i, k) => {
     const q = data[i].seq; if (!q || !ctx) return false;
-    const want = Math.round(k * (q.count - 1));
-    let im = null;
-    for (let d = 0; d < q.count && !im; d++) {
-      for (const j of [want - d, want + d]) { const f = q.frames[j]; if (f && f.complete && f.naturalWidth) { im = f; break; } }
+    const x = k * (q.count - 1), lo = Math.floor(x), hi = Math.min(q.count - 1, lo + 1), frac = x - lo;
+    let A = ready(q.frames[lo]) ? q.frames[lo] : null, B = ready(q.frames[hi]) ? q.frames[hi] : null;
+    if (!A && !B) {                                            // aún no llegan: el cuadro descargado más cercano
+      const want = Math.round(x);
+      for (let d = 1; d < q.count && !A; d++) for (const j of [want - d, want + d]) if (ready(q.frames[j])) { A = q.frames[j]; break; }
+      if (!A) return false;
     }
-    if (!im) return false;
     const a = data[i], b = data[i + 1];
     const fx = a.fx + (b.fx - a.fx) * k, fy = a.fy + (b.fy - a.fy) * k, s = HOLD_ZOOM + (1 - HOLD_ZOOM) * k;
     const cw = canvas.width, ch = canvas.height;
     const W = Math.max(cw, ch * 16 / 9), H = Math.max(ch, cw * 9 / 16);
-    const x = fx * (cw - W) + fx * W * (1 - s), y = (ch - H) / 2 + fy * H * (1 - s);
-    ctx.drawImage(im, x, y, W * s, H * s);
+    const dx = fx * (cw - W) + fx * W * (1 - s), dy = (ch - H) / 2 + fy * H * (1 - s);
+    // Fundido entre el cuadro anterior y el siguiente: el movimiento no avanza a saltos
+    ctx.globalAlpha = 1; ctx.drawImage(A || B, dx, dy, W * s, H * s);
+    if (A && B && A !== B && frac > .01) { ctx.globalAlpha = frac; ctx.drawImage(B, dx, dy, W * s, H * s); ctx.globalAlpha = 1; }
     return true;
   };
 
@@ -93,13 +98,15 @@
   };
 
   /* ---------- Cuadro por cuadro ---------- */
-  let near = -1, on = -2, ticking = false;
+  let near = -1, on = -2;
   const scrollLen = () => tour.offsetHeight - innerHeight;
-
-  function update() {
-    ticking = false;
+  const progress = () => {
     const r = tour.getBoundingClientRect();
-    const p = clamp(-r.top / Math.max(1, r.height - innerHeight));
+    header?.classList.toggle('is-solid', r.bottom <= (header.offsetHeight || 60));
+    return clamp(-r.top / Math.max(1, r.height - innerHeight));
+  };
+
+  function render(p) {
     const t = p * T;
     let i = Math.floor(t), f = t - i, k = 0;
     if (i >= n - 1) { i = n - 1; f = 0; }
@@ -119,11 +126,11 @@
     shots.forEach((el, j) => {
       let o = 0, s = 1;
       if (j === i) {
-        s = (1 + .035 * hold) * (seqOn ? 1 : 1 + .6 * k);        // la cámara avanza hacia el enfoque
-        o = seqOn ? (k < .1 ? 1 : 0) : 1 - smooth(.45, .95, k);
+        s = (1 + .035 * hold) * (seqOn ? 1 : 1 + .28 * k);       // la cámara avanza hacia el enfoque
+        o = seqOn ? (k < .1 ? 1 : 0) : 1 - smooth(.8, 1, k);     // se queda debajo hasta que la siguiente la cubre
       } else if (j === i + 1 && k > 0) {
-        s = seqOn ? 1 : 1.16 - .16 * k;                           // la siguiente pieza llega y se asienta
-        o = seqOn ? (k > .9 ? 1 : 0) : smooth(.3, .9, k);
+        s = seqOn ? 1 : 1.08 - .08 * k;                           // la siguiente pieza llega encima y se asienta
+        o = seqOn ? (k > .9 ? 1 : 0) : smooth(.15, .8, k);
         if (k >= 1) o = 1;
       }
       el.style.setProperty('--o', o.toFixed(3));
@@ -147,12 +154,21 @@
     else setPlan(data[at].floor, data[at].px, data[at].py);
 
     rail?.style.setProperty('--p', p.toFixed(4));
-    header?.classList.toggle('is-solid', r.bottom <= (header.offsetHeight || 60));
   }
 
+  // Inercia: el valor mostrado se acerca al del scroll con un deslizamiento exponencial (independiente de los fps)
+  let target = progress(), shown = target, running = false, last = 0;
+  const loop = ts => {
+    const dt = last ? Math.min(64, ts - last) : 16; last = ts;
+    shown += (target - shown) * (1 - Math.exp(-dt / SMOOTH_MS));
+    if (Math.abs(target - shown) < 1e-5) shown = target;
+    render(shown);
+    if (shown !== target) requestAnimationFrame(loop); else { running = false; last = 0; }
+  };
   const onScroll = () => {
     if (!armed) { armed = true; near = -1; }                      // las secuencias se descargan después del primer scroll
-    if (!ticking) { ticking = true; requestAnimationFrame(update); }
+    target = progress();
+    if (!running) { running = true; requestAnimationFrame(loop); }
   };
   addEventListener('scroll', onScroll, { passive: true });
   addEventListener('resize', () => { sizeCanvas(); onScroll(); });
@@ -170,5 +186,5 @@
 
   tour.classList.add('is-live');
   sizeCanvas();
-  update();
+  render(shown);
 })();

@@ -25,10 +25,13 @@
 
 /* ---------- Modo cámara ---------- */
 @media (prefers-reduced-motion: no-preference) {
-  .js .tour { --per: 150svh; height: calc((var(--n) - .4) * var(--per) + 100svh); }
+  .js .tour { --per: 160svh; height: calc((var(--n) - .4) * var(--per) + 100svh); }
   .js .tour__stage { position: sticky; top: 0; height: 100svh; overflow: hidden; }
   .js .tour__stage::after { content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none;
     background: linear-gradient(to top, color-mix(in srgb, var(--carbon) 94%, transparent) 0%, color-mix(in srgb, var(--carbon) 70%, transparent) 28%, color-mix(in srgb, var(--carbon) 18%, transparent) 52%, transparent 70%); }
+  /* Grano de película, estático y casi imperceptible: da textura cinematográfica sin costo de animación */
+  .js .tour__stage::before { content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none; opacity: .07; mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
   .js .tour__shots, .js .stop { position: absolute; inset: 0; }
   .js .stop { pointer-events: none; }
   .js .stop.is-on, .js .tour:not(.is-live) .stop--hero { pointer-events: auto; }
@@ -44,11 +47,11 @@
   .js .tour__seq { display: block; position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; opacity: var(--o, 0); pointer-events: none; }
 
   .js .stop__cap { position: absolute; z-index: 3; inset: auto 0 0 0; padding: 0 0 calc(var(--dock-h) + var(--safe-b) + 18px); }
-  .js .stop__cap .wrap > * { opacity: 0; transform: translateY(22px); transition: opacity .6s var(--ease), transform 1s var(--ease); }
+  .js .stop__cap .wrap > * { opacity: 0; transform: translateY(18px); filter: blur(6px); transition: opacity .9s var(--ease), transform 1.2s var(--ease), filter .9s var(--ease); }
   .js .stop__cap .wrap > :nth-child(2) { transition-delay: .07s; } .js .stop__cap .wrap > :nth-child(3) { transition-delay: .14s; }
   .js .stop__cap .wrap > :nth-child(n+4) { transition-delay: .21s; }
-  .js .stop.is-on .stop__cap .wrap > *, .js .tour:not(.is-live) .stop--hero .stop__cap .wrap > * { opacity: 1; transform: none; }
-  .js .stop:not(.is-on) .stop__cap .wrap > * { transition-delay: 0s; transition-duration: .3s; }
+  .js .stop.is-on .stop__cap .wrap > *, .js .tour:not(.is-live) .stop--hero .stop__cap .wrap > * { opacity: 1; transform: none; filter: none; }
+  .js .stop:not(.is-on) .stop__cap .wrap > * { transition-delay: 0s; transition-duration: .45s; }
   .js .stop__cap .label { color: var(--ink); }
 
   /* Mini plano: dónde estás en la casa */
