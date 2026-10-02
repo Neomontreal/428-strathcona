@@ -1,0 +1,106 @@
+/* Recorrido por scroll.
+   Modo lista (sin JS o con movimiento reducido): las paradas se apilan como fotos con su texto.
+   Modo recorrido (.js + movimiento permitido): escenario fijo y la cámara avanza de foto en foto. */
+
+/* ---------- Modo lista ---------- */
+.tour { position: relative; background: var(--carbon); }
+.stop { position: relative; }
+.stop__shot img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; }
+.stop--hero .stop__shot img { aspect-ratio: 4 / 5; }
+.stop__cap { position: relative; padding: 24px 0 56px; }
+.stop__cap h2 { margin-bottom: 20px; max-width: 11em; }
+.stop__num { color: var(--ink); }
+.stop__sep { width: 28px; height: 1px; background: var(--line-2); }
+.stop__facts { display: flex; flex-wrap: wrap; align-items: center; row-gap: 6px; max-width: 42rem; font-size: .9375rem; color: var(--ink-2); }
+.stop__facts li { display: inline-flex; align-items: center; }
+.stop__facts li + li::before { content: ""; width: 3px; height: 3px; margin: 0 14px; border-radius: 50%; background: var(--steel); }
+.stop--hero .lead { margin-top: 22px; }
+.teaser { display: inline-flex; align-items: center; gap: 14px; margin-top: 26px; font-family: var(--serif); font-style: italic; font-size: clamp(1.25rem, 4.6vw, 1.6rem); line-height: 1.2; }
+.teaser i { width: 8px; height: 8px; border-radius: 50%; background: var(--steel); flex: none; }
+@media (prefers-reduced-motion: no-preference) { .teaser i { animation: pulse 2.4s var(--ease-ui) infinite; } }
+@keyframes pulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--steel) 55%, transparent); } 70%, 100% { box-shadow: 0 0 0 12px transparent; } }
+.stop--hero .actions { margin-top: 30px; }
+.tour__seq, .tour__plan, .tour__rail, .tour__index, .tour__count { display: none; }
+.tour__note { padding-block: 22px; font-size: .75rem; line-height: 1.5; color: var(--ink-3); }
+
+/* ---------- Modo cámara ---------- */
+@media (prefers-reduced-motion: no-preference) {
+  .js .tour { --per: 150svh; height: calc((var(--n) - .4) * var(--per) + 100svh); }
+  .js .tour__stage { position: sticky; top: 0; height: 100svh; overflow: hidden; }
+  .js .tour__stage::after { content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none;
+    background: linear-gradient(to top, color-mix(in srgb, var(--carbon) 94%, transparent) 0%, color-mix(in srgb, var(--carbon) 70%, transparent) 28%, color-mix(in srgb, var(--carbon) 18%, transparent) 52%, transparent 70%); }
+  .js .tour__shots, .js .stop { position: absolute; inset: 0; }
+  .js .stop { pointer-events: none; }
+  .js .stop.is-on, .js .tour:not(.is-live) .stop--hero { pointer-events: auto; }
+
+  .js .stop__shot { position: absolute; inset: 0; z-index: 0; overflow: hidden; opacity: var(--o, 0); }
+  .js .stop:first-child .stop__shot { --o: 1; }
+  .js .stop:not(.is-near):not(:nth-child(-n+2)) .stop__shot { display: none; }  /* no descarga fotos lejanas */
+  /* Encuadre 16:9 que cubre la pantalla (igual que los cuadros del video), centrado según el enfoque */
+  .js .stop__shot img { position: absolute; left: var(--fx); top: 50%; max-width: none; aspect-ratio: auto;
+    width: max(100%, calc(100svh * 16 / 9)); height: max(100%, calc(100vw * 9 / 16)); object-fit: cover; object-position: 50% 50%;
+    transform-origin: var(--fx) var(--fy); transform: translate(calc(-1 * var(--fx)), -50%) scale(var(--s, 1)); will-change: transform; }
+
+  .js .tour__seq { display: block; position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; opacity: var(--o, 0); pointer-events: none; }
+
+  .js .stop__cap { position: absolute; z-index: 3; inset: auto 0 0 0; padding: 0 0 calc(var(--dock-h) + var(--safe-b) + 18px); }
+  .js .stop__cap .wrap > * { opacity: 0; transform: translateY(22px); transition: opacity .6s var(--ease), transform 1s var(--ease); }
+  .js .stop__cap .wrap > :nth-child(2) { transition-delay: .07s; } .js .stop__cap .wrap > :nth-child(3) { transition-delay: .14s; }
+  .js .stop__cap .wrap > :nth-child(n+4) { transition-delay: .21s; }
+  .js .stop.is-on .stop__cap .wrap > *, .js .tour:not(.is-live) .stop--hero .stop__cap .wrap > * { opacity: 1; transform: none; }
+  .js .stop:not(.is-on) .stop__cap .wrap > * { transition-delay: 0s; transition-duration: .3s; }
+  .js .stop__cap .label { color: var(--ink); }
+
+  /* Mini plano: dónde estás en la casa */
+  .js .tour__plan { display: block; position: absolute; z-index: 4; right: 12px; top: calc(var(--header-h) + 10px); width: 112px; padding: 9px 9px 11px;
+    border: 1px solid var(--line); border-radius: 16px; background: color-mix(in srgb, var(--carbon) 55%, transparent);
+    -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); transition: opacity .6s var(--ease), transform .6s var(--ease); }
+  .js .tour[data-at="0"] .tour__plan { opacity: 0; transform: translateY(-8px); }
+  .tour__floor { display: grid; margin-bottom: 8px; font: 500 .5625rem/1.3 var(--sans); letter-spacing: .16em; text-transform: uppercase; }
+  .tour__floor span { color: var(--ink-3); }
+  .tour__planbox { position: relative; }
+  .tour__planbox img { width: 100%; filter: grayscale(1) invert(1); mix-blend-mode: screen; opacity: .78; transition: opacity .3s; }
+  .tour__planbox img.is-swap { opacity: 0; }
+  .tour__dotwrap { position: absolute; inset: 0; pointer-events: none; transform: translate(var(--x, 50%), var(--y, 50%)); transition: transform .6s var(--ease); }
+  .tour__dotwrap i { position: absolute; left: -5px; top: -5px; width: 10px; height: 10px; border-radius: 50%; background: var(--steel); }
+  .tour__dotwrap i::after { content: ""; position: absolute; inset: -6px; border-radius: 50%; border: 1px solid var(--steel); animation: ping 2s var(--ease) infinite; }
+
+  /* Contador (celular) e índice de cuartos (escritorio) */
+  .js .tour__count { display: block; position: absolute; z-index: 4; left: var(--gutter); top: calc(var(--header-h) + 14px); font-size: .75rem; letter-spacing: .14em; color: var(--ink-3);
+    transition: opacity .6s var(--ease); }
+  .tour__count strong { font-weight: 500; color: var(--ink); }
+  .js .tour[data-at="0"] .tour__count { opacity: 0; }
+}
+@keyframes ping { from { transform: scale(.5); opacity: 1; } to { transform: scale(1.6); opacity: 0; } }
+
+@media (min-width: 900px) {
+  .stop--hero .stop__shot img { aspect-ratio: 16 / 9; }
+  .stop__cap h2 { font-size: clamp(3rem, 6vw, 6.4rem); }
+  .stop__facts { font-size: 1rem; }
+  .stop--hero h1 { font-size: clamp(5rem, 11vw, 12rem); }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .js .stop__cap { padding-bottom: clamp(44px, 8vh, 80px); }
+    .js .tour__stage::after { background:
+      linear-gradient(to top, color-mix(in srgb, var(--carbon) 90%, transparent) 0%, color-mix(in srgb, var(--carbon) 45%, transparent) 34%, transparent 62%),
+      linear-gradient(to right, color-mix(in srgb, var(--carbon) 62%, transparent) 0%, color-mix(in srgb, var(--carbon) 22%, transparent) 38%, transparent 60%); }
+    .js .stop__cap .wrap { padding-right: clamp(240px, 22vw, 320px); }
+    .js .tour__plan { top: auto; bottom: clamp(44px, 8vh, 80px); right: var(--gutter); width: clamp(200px, 16vw, 250px); padding: 16px 16px 18px; border-radius: 22px; }
+    .js .tour[data-at="0"] .tour__plan { transform: translateY(8px); }
+    .tour__floor { font-size: .625rem; margin-bottom: 12px; }
+    .js .tour__count { display: none; }
+    .js .tour__index { display: block; position: absolute; z-index: 4; right: var(--gutter); top: calc(var(--header-h) + 28px); padding: 14px 16px 14px 20px;
+      border: 1px solid var(--line); border-radius: 18px; background: color-mix(in srgb, var(--carbon) 52%, transparent);
+      -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); transition: opacity .6s var(--ease); }
+    .js .tour[data-at="0"] .tour__index { opacity: 0; pointer-events: none; }
+    .tour__index a { display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 3px 0; text-decoration: none; font-size: .75rem; color: var(--ink-2); transition: color .4s var(--ease-ui); }
+    .tour__index a span { order: 2; width: 18px; font-size: .6875rem; letter-spacing: .1em; }
+    .tour__index a::after { content: ""; order: 3; width: 14px; height: 1px; background: currentColor; transform-origin: 100% 50%; transform: scaleX(.4); transition: transform .5s var(--ease); }
+    .tour__index a:hover, .tour__index a[aria-current="step"] { color: var(--ink); }
+    .tour__index a[aria-current="step"]::after { transform: scaleX(1.6); background: var(--steel); }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tour__dotwrap i::after, .teaser i { animation: none; }
+}
