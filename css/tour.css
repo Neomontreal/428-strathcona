@@ -69,6 +69,12 @@
   .tour__planbox img.is-swap { opacity: 0; }
   .tour__dotwrap { position: absolute; inset: 0; pointer-events: none; transform: translate(var(--x, 50%), var(--y, 50%)); transition: transform .6s var(--ease); }
   .tour__dotwrap i { position: absolute; left: -5px; top: -5px; width: 10px; height: 10px; border-radius: 50%; background: var(--steel); }
+  /* Cono de visión: hacia dónde mira la cámara en esta parada */
+  .tour__cone { position: absolute; left: -20px; top: -20px; width: 40px; height: 40px; border-radius: 50%; opacity: 0;
+    background: conic-gradient(from -32deg, color-mix(in srgb, var(--steel) 62%, transparent) 0deg 64deg, transparent 64deg);
+    -webkit-mask: radial-gradient(circle, #000 35%, transparent 72%); mask: radial-gradient(circle, #000 35%, transparent 72%);
+    transform: rotate(var(--dir, 0deg)); transition: transform .7s var(--ease), opacity .4s; }
+  .tour__dotwrap.has-dir .tour__cone { opacity: 1; }
   .tour__dotwrap i::after { content: ""; position: absolute; inset: -6px; border-radius: 50%; border: 1px solid var(--steel); animation: ping 2s var(--ease) infinite; }
 
   /* Contador (celular) e índice de cuartos (escritorio) */

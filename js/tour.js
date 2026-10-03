@@ -35,6 +35,7 @@
   const data = stops.map(s => {
     const [fx, fy] = (s.dataset.focus || '50 50').split(' ').map(v => Number(v) / 100);
     return { floor: s.dataset.floor, px: Number(s.dataset.px), py: Number(s.dataset.py), fx, fy,
+      dir: s.dataset.pd === undefined ? null : Number(s.dataset.pd),   // hacia dónde mira la cámara en el plano (0 = arriba)
       cut: s.dataset.link === 'cut',   // espacios que no se tocan en el plano: fundido a negro, sin fingir que se camina
       seq: s.dataset.seq ? { dir: s.dataset.seq, count: Number(s.dataset.seqCount) || 0, mobile: Number(s.dataset.seqM) || 0, frames: [], started: false } : null };
   });
@@ -97,8 +98,17 @@
 
   /* ---------- Mini plano ---------- */
   let shownFloor = data[0].floor;
-  const setPlan = (floor, x, y) => {
-    if (dot) { dot.style.setProperty('--x', `${x}%`); dot.style.setProperty('--y', `${y}%`); }
+  let shownDir = null;
+  const setPlan = (floor, x, y, dir) => {
+    if (dot) {
+      dot.style.setProperty('--x', `${x}%`); dot.style.setProperty('--y', `${y}%`);
+      dot.classList.toggle('has-dir', dir != null);
+      if (dir != null) {                                         // gira por el camino más corto (sin vueltas de 300°)
+        if (shownDir == null) shownDir = dir;
+        shownDir += ((dir - shownDir) % 360 + 540) % 360 - 180;
+        dot.style.setProperty('--dir', `${shownDir}deg`);
+      }
+    }
     if (!planImg || floor === shownFloor || !floors[floor]) return;
     shownFloor = floor;
     planImg.classList.add('is-swap');
@@ -166,8 +176,9 @@
       if (countNow) countNow.textContent = String(at + 1).padStart(2, '0');
     }
     const a = data[i], b = data[Math.min(n - 1, i + 1)];
-    if (a.floor === b.floor && k > 0) setPlan(a.floor, a.px + (b.px - a.px) * k, a.py + (b.py - a.py) * k);
-    else setPlan(data[at].floor, data[at].px, data[at].py);
+    const turn = (d1, d2, t) => d1 == null || d2 == null ? (t < .5 ? d1 : d2) : d1 + (((d2 - d1) % 360 + 540) % 360 - 180) * t;
+    if (a.floor === b.floor && k > 0 && !a.cut) setPlan(a.floor, a.px + (b.px - a.px) * k, a.py + (b.py - a.py) * k, turn(a.dir, b.dir, k));
+    else setPlan(data[at].floor, data[at].px, data[at].py, data[at].dir);
 
     rail?.style.setProperty('--p', p.toFixed(4));
   }
