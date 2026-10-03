@@ -35,6 +35,7 @@
   const data = stops.map(s => {
     const [fx, fy] = (s.dataset.focus || '50 50').split(' ').map(v => Number(v) / 100);
     return { floor: s.dataset.floor, px: Number(s.dataset.px), py: Number(s.dataset.py), fx, fy,
+      cut: s.dataset.link === 'cut',   // espacios que no se tocan en el plano: fundido a negro, sin fingir que se camina
       seq: s.dataset.seq ? { dir: s.dataset.seq, count: Number(s.dataset.seqCount) || 0, frames: [], started: false } : null };
   });
 
@@ -123,9 +124,13 @@
     const seqOn = k > 0 && k < 1 && drawFrame(i, k);
     canvas?.style.setProperty('--o', seqOn ? (smooth(0, .05, k) * (1 - smooth(.95, 1, k))).toFixed(3) : '0');
 
+    const cut = !seqOn && data[i].cut;
     shots.forEach((el, j) => {
       let o = 0, s = 1;
-      if (j === i) {
+      if (cut && (j === i || j === i + 1) && k > 0) {           // corte: la foto sale a negro y la siguiente entra
+        o = j === i ? 1 - smooth(0, .48, k) : smooth(.52, 1, k);
+        s = j === i ? 1 + .035 * hold : 1.03 - .03 * k;
+      } else if (j === i) {
         s = (1 + .035 * hold) * (seqOn ? 1 : 1 + .28 * k);       // la cámara avanza hacia el enfoque
         o = seqOn ? (k < .1 ? 1 : 0) : 1 - smooth(.8, 1, k);     // se queda debajo hasta que la siguiente la cubre
       } else if (j === i + 1 && k > 0) {
