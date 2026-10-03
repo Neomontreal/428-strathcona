@@ -36,21 +36,24 @@
     const [fx, fy] = (s.dataset.focus || '50 50').split(' ').map(v => Number(v) / 100);
     return { floor: s.dataset.floor, px: Number(s.dataset.px), py: Number(s.dataset.py), fx, fy,
       cut: s.dataset.link === 'cut',   // espacios que no se tocan en el plano: fundido a negro, sin fingir que se camina
-      seq: s.dataset.seq ? { dir: s.dataset.seq, count: Number(s.dataset.seqCount) || 0, frames: [], started: false } : null };
+      seq: s.dataset.seq ? { dir: s.dataset.seq, count: Number(s.dataset.seqCount) || 0, mobile: Number(s.dataset.seqM) || 0, frames: [], started: false } : null };
   });
 
   /* ---------- Secuencias (cuadros de la transición) ---------- */
   // Carga progresiva: primero 1 de cada 8 cuadros, luego se completa (la transición ya funciona con pocos)
   let armed = false;
+  // En vertical se ve solo una franja del cuadro 16:9: si hay versión móvil (m/), se usa esa franja a resolución nativa
+  const portraitFraction = () => canvas ? canvas.width / Math.max(canvas.width, canvas.height * 16 / 9) : 1;
   const loadSeq = i => {
     const q = data[i]?.seq;
     if (!armed || !q || q.started || !q.count) return;
     q.started = true;
+    q.strip = q.mobile > 0 && portraitFraction() <= q.mobile * .98;
     for (const step of [8, 4, 2, 1]) {
       for (let k = 0; k < q.count; k += step) {
         if (q.frames[k]) continue;
         const im = new Image(); im.decoding = 'async';
-        im.src = `${q.dir}/${String(k + 1).padStart(3, '0')}.webp`;
+        im.src = `${q.dir}/${q.strip ? 'm/' : ''}${String(k + 1).padStart(3, '0')}.webp`;
         q.frames[k] = im;
       }
     }
@@ -67,20 +70,28 @@
   const drawFrame = (i, k) => {
     const q = data[i].seq; if (!q || !ctx) return false;
     const x = k * (q.count - 1), lo = Math.floor(x), hi = Math.min(q.count - 1, lo + 1), frac = x - lo;
-    let A = ready(q.frames[lo]) ? q.frames[lo] : null, B = ready(q.frames[hi]) ? q.frames[hi] : null;
-    if (!A && !B) {                                            // aún no llegan: el cuadro descargado más cercano
+    let A = ready(q.frames[lo]) ? lo : -1, B = ready(q.frames[hi]) ? hi : -1;
+    if (A < 0 && B < 0) {                                       // aún no llegan: el cuadro descargado más cercano
       const want = Math.round(x);
-      for (let d = 1; d < q.count && !A; d++) for (const j of [want - d, want + d]) if (ready(q.frames[j])) { A = q.frames[j]; break; }
-      if (!A) return false;
+      for (let d = 1; d < q.count && A < 0; d++) for (const j of [want - d, want + d]) if (ready(q.frames[j])) { A = j; break; }
+      if (A < 0) return false;
     }
     const a = data[i], b = data[i + 1];
     const fx = a.fx + (b.fx - a.fx) * k, fy = a.fy + (b.fy - a.fy) * k, s = HOLD_ZOOM + (1 - HOLD_ZOOM) * k;
     const cw = canvas.width, ch = canvas.height;
     const W = Math.max(cw, ch * 16 / 9), H = Math.max(ch, cw * 9 / 16);
-    const dx = fx * (cw - W) + fx * W * (1 - s), dy = (ch - H) / 2 + fy * H * (1 - s);
+    const bx = fx * (cw - W) + fx * W * (1 - s), by = (ch - H) / 2 + fy * H * (1 - s);
+    const put = (j, alpha) => {
+      ctx.globalAlpha = alpha;
+      if (q.strip) {                                            // la franja móvil ocupa [fx·(1−r), +r] del cuadro
+        const fj = a.fx + (b.fx - a.fx) * (j / Math.max(1, q.count - 1));
+        ctx.drawImage(q.frames[j], bx + fj * (1 - q.mobile) * W * s, by, q.mobile * W * s, H * s);
+      } else ctx.drawImage(q.frames[j], bx, by, W * s, H * s);
+    };
     // Fundido entre el cuadro anterior y el siguiente: el movimiento no avanza a saltos
-    ctx.globalAlpha = 1; ctx.drawImage(A || B, dx, dy, W * s, H * s);
-    if (A && B && A !== B && frac > .01) { ctx.globalAlpha = frac; ctx.drawImage(B, dx, dy, W * s, H * s); ctx.globalAlpha = 1; }
+    put(A >= 0 ? A : B, 1);
+    if (A >= 0 && B >= 0 && A !== B && frac > .01) put(B, frac);
+    ctx.globalAlpha = 1;
     return true;
   };
 
@@ -176,7 +187,12 @@
     if (!running) { running = true; requestAnimationFrame(loop); }
   };
   addEventListener('scroll', onScroll, { passive: true });
-  addEventListener('resize', () => { sizeCanvas(); onScroll(); });
+  addEventListener('resize', () => {
+    sizeCanvas();
+    // si cambia la orientación, la versión adecuada de cada secuencia se vuelve a pedir
+    data.forEach(d => { if (d.seq && d.seq.started && d.seq.strip !== (d.seq.mobile > 0 && portraitFraction() <= d.seq.mobile * .98)) { d.seq.started = false; d.seq.frames = []; } });
+    near = -1; onScroll();
+  });
 
   // Los enlaces a una parada (#arret-…) llevan a su punto del recorrido, no al inicio de la sección
   document.addEventListener('click', e => {
