@@ -367,6 +367,23 @@
 
     const endpoint = CFG.form?.endpoint;
     if (!endpoint) {
+      // Sitio estático: se abre WhatsApp (o el correo) del vendedor con el mensaje listo; la persona lo envía.
+      const ct = CFG.contact || {};
+      if (ct.wa || ct.email) {
+        const lines = [T.msgIntro, ct.property, ct.url].filter(Boolean);
+        $$('.field', form).forEach(fl => {
+          const input = $('input, select, textarea', fl), label = $('label', fl);
+          if (!input || !label || input.type === 'checkbox') return;
+          const v = input.tagName === 'SELECT' ? (input.value ? input.options[input.selectedIndex].text : '') : input.value.trim();
+          const name = label.childNodes[0]?.textContent.trim();
+          if (v) lines.push(`${name} : ${v}`);
+        });
+        if (f('sin_fecha')?.checked) lines.push(f('sin_fecha').closest('label').textContent.trim());
+        const text = lines.join('\n');
+        if (ct.wa) { window.open(`https://wa.me/${ct.wa}?text=${encodeURIComponent(text)}`, '_blank', 'noopener'); setStatus(T.openedWa); }
+        else { location.href = `mailto:${ct.email}?subject=${encodeURIComponent(ct.property)}&body=${encodeURIComponent(text)}`; setStatus(T.openedMail); }
+        return;
+      }
       console.warn('[site] Formulario sin destino: define el destino del formulario en el panel (Ajustes).');
       setStatus(T.noEndpoint + (CFG.hasDirect ? T.noEndpointDirect : ''), 'error');
       return;
