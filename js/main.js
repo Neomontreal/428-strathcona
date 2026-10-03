@@ -352,10 +352,21 @@
   });
 
   const setStatus = (msg, state = '') => { statusEl.textContent = msg; statusEl.dataset.state = state; };
+
+  // Sitio estático con WhatsApp y correo: dos botones de envío (la persona elige por dónde manda su solicitud)
+  if (!CFG.form?.endpoint && CFG.contact?.wa && CFG.contact?.email) {
+    const label = $('.btn__text', submitBtn) || submitBtn;
+    label.textContent = T.viaWa; submitBtn.dataset.via = 'wa';
+    const mailBtn = submitBtn.cloneNode(true); mailBtn.dataset.via = 'mail';
+    mailBtn.classList.replace('btn--primary', 'btn--ghost'); mailBtn.removeAttribute('data-submit');
+    ($('.btn__text', mailBtn) || mailBtn).textContent = T.viaMail;
+    submitBtn.after(mailBtn);
+  }
   $$('[data-servicio]').forEach(a => a.addEventListener('click', () => { f('servicio').value = a.dataset.servicio; }));
 
   form.addEventListener('submit', async e => {
     e.preventDefault();
+    const via = e.submitter?.dataset.via || 'wa';
     if (f('_gotcha').value) return;
     attempted = true; setStatus(''); alertBox.hidden = true;
 
@@ -380,7 +391,7 @@
         });
         if (f('sin_fecha')?.checked) lines.push(f('sin_fecha').closest('label').textContent.trim());
         const text = lines.join('\n');
-        if (ct.wa) { window.open(`https://wa.me/${ct.wa}?text=${encodeURIComponent(text)}`, '_blank', 'noopener'); setStatus(T.openedWa); }
+        if (ct.wa && (via === 'wa' || !ct.email)) { window.open(`https://wa.me/${ct.wa}?text=${encodeURIComponent(text)}`, '_blank', 'noopener'); setStatus(T.openedWa); }
         else { location.href = `mailto:${ct.email}?subject=${encodeURIComponent(ct.property)}&body=${encodeURIComponent(text)}`; setStatus(T.openedMail); }
         return;
       }
