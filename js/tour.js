@@ -120,7 +120,7 @@
   };
 
   /* ---------- Cuadro por cuadro ---------- */
-  let near = -1, on = -2;
+  let near = -1, on = -2, seqTimer = 0;
   const scrollLen = () => tour.offsetHeight - innerHeight;
   const progress = () => {
     const r = tour.getBoundingClientRect();
@@ -138,7 +138,9 @@
     if (i !== near) {
       near = i;  // fotos cercanas visibles + secuencias del tramo actual y el siguiente
       stops.forEach((s, j) => s.classList.toggle('is-near', j >= i - 1 && j <= i + 2));
-      loadSeq(i); loadSeq(i + 1);
+      // solo si la persona se queda en el tramo: pasar de largo (un salto, un scroll rápido) no descarga nada
+      clearTimeout(seqTimer);
+      seqTimer = setTimeout(() => { if (near === i) { loadSeq(i); loadSeq(i + 1); } }, 220);
     }
 
     // Con secuencia: el video cubre el tramo y se funde 5 % al inicio y al final sobre las fotos reales

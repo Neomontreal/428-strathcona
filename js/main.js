@@ -14,6 +14,24 @@
   const digits = v => String(v || '').replace(/\D/g, '');
   const T = CFG.ui || {};
 
+  /* ---------- Enlaces internos: los saltos largos son instantáneos ----------
+     Con smooth scroll, ir de la portada al formulario cruzaría todo el recorrido (miles de px): se verían pasar las
+     transiciones y se descargarían. Más de 3 pantallas → salto directo. */
+  const goTo = (target, hash) => {
+    const far = Math.abs(target.getBoundingClientRect().top) > innerHeight * 3;
+    if (far) html.style.scrollBehavior = 'auto';
+    target.scrollIntoView({ behavior: far ? 'auto' : behavior });
+    if (far) requestAnimationFrame(() => { html.style.scrollBehavior = ''; });
+    history.replaceState(null, '', hash);
+  };
+  document.addEventListener('click', e => {
+    const a = e.target.closest('a[href^="#"]');
+    if (!a || a.hasAttribute('data-sheet-link') || /^#arret-/.test(a.getAttribute('href'))) return;
+    const target = a.getAttribute('href').length > 1 && document.getElementById(a.getAttribute('href').slice(1));
+    if (!target) return;
+    e.preventDefault(); goTo(target, a.getAttribute('href'));
+  });
+
   /* ---------- Idioma: recordar la elección manual (cookie de 1 año) ---------- */
   document.addEventListener('click', e => {
     const a = e.target.closest('[data-lang]');
@@ -227,7 +245,7 @@
     $$('[data-sheet-link]', sheet).forEach(a => a.addEventListener('click', e => {
       e.preventDefault();
       const target = $(a.getAttribute('href'));
-      closeSheet(() => { if (target) { target.scrollIntoView({ behavior }); history.replaceState(null, '', a.getAttribute('href')); } });
+      closeSheet(() => { if (target) goTo(target, a.getAttribute('href')); });
     }));
     desktop.addEventListener('change', () => { if (sheet.open) { sheet.close(); sheet.classList.remove('is-open'); html.classList.remove('no-scroll'); } });
   }
